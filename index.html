@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>สมุดลูกหนี้ขายส่ง</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Chakra+Petch:wght@600;700&display=swap">
+<style>
+/* Layout: alert band → summary strip → entry form → customer ledger list | selected customer statement */
+:root{
+  --bg:#f3f4f1; --surface:#ffffff; --sunken:#eaece6; --line:#d6d9d0; --fg:#1c2421; --muted:#5f6b66;
+  --ink:#1d4f7a; --ink-soft:#e2ebf3;
+  --bad:#b3261e; --bad-soft:#fbe7e5; --warn:#9a5b00; --warn-soft:#fdf0d8; --ok:#2d6a3e; --ok-soft:#e3f1e6;
+  --f-display:"Chakra Petch","IBM Plex Sans Thai",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans Thai",system-ui,"Segoe UI",Tahoma,sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141a18; --surface:#1c2421; --sunken:#111614; --line:#2f3a36; --fg:#e6ebe8; --muted:#9aa7a1;
+  --ink:#8bb8e0; --ink-soft:#1f3245;
+  --bad:#ff8a80; --bad-soft:#3a1d1b; --warn:#f0b75a; --warn-soft:#352a14; --ok:#7fcf93; --ok-soft:#1a3122;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141a18; --surface:#1c2421; --sunken:#111614; --line:#2f3a36; --fg:#e6ebe8; --muted:#9aa7a1;
+  --ink:#8bb8e0; --ink-soft:#1f3245;
+  --bad:#ff8a80; --bad-soft:#3a1d1b; --warn:#f0b75a; --warn-soft:#352a14; --ok:#7fcf93; --ok-soft:#1a3122;
+  color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{color-scheme:light}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:.01em}
+h1{font-size:1.75rem;line-height:1.2}
+h2{font-size:1.15rem}
+h3{font-size:1rem}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums;white-space:nowrap}
+.muted{color:var(--muted)}
+.small{font-size:.85rem}
+.eyebrow{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+header.top .sub{color:var(--muted)}
+.today{font-family:var(--f-num);font-size:.9rem;color:var(--muted)}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.pad{padding:16px}
+
+/* alerts */
+.alerts{display:flex;flex-direction:column;gap:10px}
+.alert{display:grid;grid-template-columns:6px 1fr;border-radius:var(--r);overflow:hidden;border:1px solid var(--line);background:var(--surface)}
+.alert .stripe{background:var(--bad)}
+.alert.warn .stripe{background:var(--warn)}
+.alert .body{padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.alert .head{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;justify-content:space-between}
+.alert ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}
+.alert li{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline}
+.alert li button{background:none;border:0;padding:0;color:var(--ink);font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.alert-ok{padding:12px 14px;border-radius:var(--r);background:var(--ok-soft);color:var(--ok);font-weight:500}
+
+/* summary */
+.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.stat{padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.stat .v{font-family:var(--f-num);font-size:1.3rem;font-weight:600;font-variant-numeric:tabular-nums}
+.stat.bad .v{color:var(--bad)} .stat.warn .v{color:var(--warn)}
+@media (max-width:820px){.summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* entry form */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);padding:0 12px;overflow-x:auto}
+.tab{border:0;background:none;padding:12px 14px;cursor:pointer;color:var(--muted);font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-color:var(--ink)}
+form.entry{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:16px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1 1 160px}
+.field.wide{flex:2 1 240px}
+.field label{font-size:.82rem;font-weight:600;color:var(--muted)}
+input,select{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:9px 10px;min-height:42px;width:100%}
+input[type="number"]{font-family:var(--f-num)}
+.btn{border:1px solid var(--ink);background:var(--ink);color:var(--surface);border-radius:6px;padding:9px 16px;min-height:42px;font-weight:600;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn.danger{border-color:var(--bad);background:var(--bad);color:var(--surface)}
+.formnote{flex-basis:100%;font-size:.85rem;min-height:1.2em}
+.formnote.ok{color:var(--ok)} .formnote.err{color:var(--bad)}
+
+/* main grid */
+.main{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:20px;align-items:start}
+@media (max-width:900px){.main{grid-template-columns:minmax(0,1fr)}}
+.listhead{display:flex;flex-direction:column;gap:10px;padding:16px;border-bottom:1px solid var(--line)}
+.filters{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 12px;font-size:.85rem;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink-soft);border-color:var(--ink);color:var(--ink);font-weight:600}
+.custlist{list-style:none;margin:0;padding:0}
+.cust{border-bottom:1px solid var(--line)}
+.cust:last-child{border-bottom:0}
+.cust button{all:unset;box-sizing:border-box;display:flex;flex-direction:column;gap:6px;width:100%;padding:14px 16px;cursor:pointer}
+.cust button:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
+.cust[aria-current="true"] button{background:var(--ink-soft)}
+.cust .row1{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.cust .name{font-weight:600;min-width:0;overflow-wrap:anywhere}
+.meter{height:6px;background:var(--sunken);border-radius:3px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--ink);border-radius:3px}
+.meter.warn i{background:var(--warn)} .meter.bad i{background:var(--bad)}
+.cust .row2{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:.82rem;color:var(--muted)}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pill{font-size:.75rem;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.info{background:var(--ink-soft);color:var(--ink)}
+.pill.sample{background:var(--sunken);color:var(--muted)}
+
+/* detail */
+.detail-head{padding:16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:12px}
+.kv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.kv div{display:flex;flex-direction:column;gap:2px}
+.kv .num{font-size:1.05rem;font-weight:600}
+@media (max-width:520px){.kv{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.section{padding:16px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--line)}
+.section:last-child{border-bottom:0}
+.tablewrap{overflow-x:auto;margin:0 -16px;padding:0 16px}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:560px}
+th{text-align:left;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+td.r,th.r{text-align:right}
+tr.overdue td{background:var(--bad-soft)}
+.linkbtn{background:none;border:0;padding:2px 4px;color:var(--muted);cursor:pointer;font-size:.8rem;text-decoration:underline;text-underline-offset:2px}
+.linkbtn.confirm{color:var(--bad);font-weight:700}
+.empty{padding:28px 16px;text-align:center;color:var(--muted);display:flex;flex-direction:column;gap:6px;align-items:center}
+.empty strong{color:var(--fg)}
+details.settings summary{cursor:pointer;font-weight:600;padding:12px 16px}
+details.settings .inner{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:0 16px 16px}
+.banner{padding:12px 14px;border-radius:var(--r);background:var(--warn-soft);color:var(--warn)}
+@media (prefers-reduced-motion:no-preference){.meter i{transition:width .3s ease}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">ยอดสั่งสะสม · ยอดโอน · ยอดค้าง</div>
+      <h1>สมุดลูกหนี้ขายส่ง</h1>
+      <div class="sub small">ยอดค้าง = ยอดสั่งสะสม − ยอดโอนแล้ว · เงินโอนตัดบิลเก่าสุดก่อน</div>
+      <div class="sub small">ข้อมูลเก็บไว้ในเบราว์เซอร์เครื่องนี้เท่านั้น · กด “สำรองข้อมูล” ด้านล่างเป็นประจำ</div>
+    </div>
+    <div class="today" id="today"></div>
+  </header>
+
+  <div id="status" class="banner" hidden></div>
+
+  <section class="alerts" id="alerts" aria-live="polite"></section>
+
+  <section class="summary" id="summary"></section>
+
+  <section class="panel">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tab-order" aria-selected="true" data-tab="order">บันทึกการสั่งของ</button>
+      <button class="tab" role="tab" id="tab-pay" aria-selected="false" data-tab="pay">บันทึกการโอนเงิน</button>
+      <button class="tab" role="tab" id="tab-cust" aria-selected="false" data-tab="cust">เพิ่มลูกค้า</button>
+    </div>
+    <form class="entry" id="f-order" data-form="order">
+      <div class="field wide"><label for="o-cust">ลูกค้า</label><select id="o-cust" required></select></div>
+      <div class="field"><label for="o-date">วันที่สั่ง</label><input id="o-date" type="date" required></div>
+      <div class="field"><label for="o-amt">ยอดสั่ง (บาท)</label><input id="o-amt" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="เช่น 250000" required></div>
+      <div class="field wide"><label for="o-note">เลขบิล / หมายเหตุ</label><input id="o-note" type="text" placeholder="เช่น INV-0123"></div>
+      <button class="btn" type="submit">บันทึกการสั่ง</button>
+      <div class="formnote" id="n-order"></div>
+    </form>
+    <form class="entry" id="f-pay" data-form="pay" hidden>
+      <div class="field wide"><label for="p-cust">ลูกค้า</label><select id="p-cust" required></select></div>
+      <div class="field"><label for="p-date">วันที่โอน</label><input id="p-date" type="date" required></div>
+      <div class="field"><label for="p-amt">ยอดโอน (บาท)</label><input id="p-amt" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="เช่น 1000000" required></div>
+      <div class="field wide"><label for="p-note">ธนาคาร / หมายเหตุ</label><input id="p-note" type="text" placeholder="เช่น KBank โอนเข้า"></div>
+      <button class="btn" type="submit">บันทึกการโอน</button>
+      <div class="formnote" id="n-pay"></div>
+    </form>
+    <form class="entry" id="f-cust" data-form="cust" hidden>
+      <div class="field wide"><label for="c-name">ชื่อลูกค้า / ร้าน</label><input id="c-name" type="text" required></div>
+      <div class="field"><label for="c-phone">เบอร์โทร</label><input id="c-phone" type="tel"></div>
+      <div class="field wide"><label for="c-note">หมายเหตุ</label><input id="c-note" type="text" placeholder="เช่น สาขา, ผู้ติดต่อ"></div>
+      <button class="btn" type="submit">เพิ่มลูกค้า</button>
+      <div class="formnote" id="n-cust"></div>
+    </form>
+  </section>
+
+  <section class="main">
+    <div class="panel" style="min-width:0">
+      <div class="listhead">
+        <h2>ลูกค้าทั้งหมด</h2>
+        <input id="search" type="search" placeholder="ค้นหาชื่อลูกค้า" aria-label="ค้นหาชื่อลูกค้า">
+        <div class="filters" role="group" aria-label="กรองลูกค้า">
+          <button class="chip" data-filter="all" aria-pressed="true">ทั้งหมด</button>
+          <button class="chip" data-filter="limit" aria-pressed="false">ค้างเกินวงเงิน</button>
+          <button class="chip" data-filter="overdue" aria-pressed="false">ค้างเกินกำหนด</button>
+          <button class="chip" data-filter="owing" aria-pressed="false">มียอดค้าง</button>
+        </div>
+      </div>
+      <ul class="custlist" id="custlist"></ul>
+    </div>
+    <div class="panel" id="detail" style="min-width:0"></div>
+  </section>
+
+  <details class="panel settings" id="settings">
+    <summary>ตั้งค่าเงื่อนไขแจ้งเตือน</summary>
+    <form class="inner" id="f-settings">
+      <div class="field"><label for="s-limit">แจ้งเตือนเมื่อยอดค้างถึง (บาท)</label><input id="s-limit" type="number" min="1" step="1"></div>
+      <div class="field"><label for="s-days">ครบกำหนดชำระหลังวันสั่ง (วัน)</label><input id="s-days" type="number" min="1" step="1"></div>
+      <button class="btn ghost" type="submit">บันทึกการตั้งค่า</button>
+      <button class="btn ghost" type="button" id="clear-sample" hidden>ลบข้อมูลตัวอย่างทั้งหมด</button>
+      <div class="formnote" id="n-settings"></div>
+    </form>
+  </details>
+
+  <section class="panel pad" style="display:flex;flex-direction:column;gap:10px">
+    <h2>สำรองและกู้คืนข้อมูล</h2>
+    <p class="small muted" style="margin:0">ข้อมูลอยู่ในเบราว์เซอร์นี้เท่านั้น ถ้าล้างประวัติเบราว์เซอร์หรือเปลี่ยนเครื่อง ข้อมูลจะหาย ให้ดาวน์โหลดไฟล์สำรองเก็บไว้ และนำเข้าไฟล์เดียวกันเมื่อย้ายไปเครื่องอื่น</p>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+      <button class="btn" type="button" id="export">ดาวน์โหลดไฟล์สำรอง (.json)</button>
+      <label class="btn ghost" for="import-file" style="display:inline-flex;align-items:center">เลือกไฟล์สำรองเพื่อนำเข้า</label>
+      <input id="import-file" type="file" accept="application/json,.json" hidden>
+      <button class="btn danger" type="button" id="import-confirm" hidden>แทนที่ข้อมูลทั้งหมดด้วยไฟล์นี้</button>
+    </div>
+    <div class="formnote" id="n-backup"></div>
+  </section>
+</div>
+
+<script>
+(function(){
+  const $ = s => document.querySelector(s);
+  const state = { customers:[], orders:[], payments:[], settings:{limit:5000000,dueDays:7},
+    loaded:{c:false,o:false,p:false}, selected:null, filter:"all", q:"", db:null, canWrite:true };
+
+  const money = new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmt = n => "฿" + money.format(Math.round(n*100)/100);
+  const fmtShort = n => n>=1e6 ? "฿"+(n/1e6).toLocaleString("th-TH",{maximumFractionDigits:2})+" ล้าน" : fmt(n);
+  const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const pad = n => String(n).padStart(2,"0");
+  const isoLocal = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+  const parseISO = s => { const [y,m,d]=String(s).split("-").map(Number); return new Date(y,(m||1)-1,d||1); };
+  const addDays = (s,n) => { const d=parseISO(s); d.setDate(d.getDate()+n); return isoLocal(d); };
+  const daysBetween = (a,b) => Math.round((parseISO(b)-parseISO(a))/86400000);
+  const thDate = s => s ? parseISO(s).toLocaleDateString("th-TH",{day:"numeric",month:"short",year:"2-digit"}) : "—";
+  const today = () => isoLocal(new Date());
+
+  $("#today").textContent = "วันนี้ " + new Date().toLocaleDateString("th-TH",{weekday:"short",day:"numeric",month:"long",year:"numeric"});
+  ["#o-date","#p-date"].forEach(s=>$(s).value=today());
+
+  /* ---------- core calculation: payments clear the oldest orders first ---------- */
+  function analyze(cust){
+    const t = today(), L = state.settings.limit, D = state.settings.dueDays;
+    const os = state.orders.filter(o=>o.customerId===cust.id)
+      .map(o=>({...o, rem:Number(o.amount)||0, pays:[], clearedOn:null}))
+      .sort((a,b)=>a.date.localeCompare(b.date)||String(a.createdAt).localeCompare(String(b.createdAt)));
+    const ps = state.payments.filter(p=>p.customerId===cust.id)
+      .sort((a,b)=>a.date.localeCompare(b.date)||String(a.createdAt).localeCompare(String(b.createdAt)));
+    let i=0, credit=0;
+    for(const p of ps){
+      let left = Number(p.amount)||0;
+      while(left>0.004 && i<os.length){
+        const take = Math.min(left, os[i].rem);
+        os[i].rem -= take; left -= take; os[i].pays.push({date:p.date,amount:take});
+        if(os[i].rem<=0.004){ os[i].rem=0; os[i].clearedOn=p.date; i++; }
+      }
+      credit += left>0.004 ? left : 0;
+    }
+    for(const o of os){
+      o.due = addDays(o.date, D);
+      o.late = o.rem>0 ? daysBetween(o.due, t) : 0;
+      o.overdue = o.rem>0 && o.late>0;
+      o.status = o.rem===0 ? "paid" : (o.pays.length ? "partial" : "unpaid");
+    }
+    const totalOrder = os.reduce((s,o)=>s+(Number(o.amount)||0),0);
+    const totalPaid = ps.reduce((s,p)=>s+(Number(p.amount)||0),0);
+    const owing = totalOrder-totalPaid;
+    const overdue = os.filter(o=>o.overdue);
+    return { cust, os, ps, totalOrder, totalPaid, owing, credit,
+      overLimit: owing>=L, nearLimit: owing>=L*0.8 && owing<L,
+      overdue, overdueAmt: overdue.reduce((s,o)=>s+o.rem,0),
+      lastOrder: os.length? os[os.length-1].date : null,
+      lastPay: ps.length? ps[ps.length-1].date : null };
+  }
+
+  /* ---------- rendering ---------- */
+  function render(){
+    const all = state.customers.map(analyze);
+    renderAlerts(all); renderSummary(all); renderSelects(); renderList(all); renderDetail(all);
+    $("#clear-sample").hidden = !(state.customers.some(c=>c.sample)||state.orders.some(o=>o.sample)||state.payments.some(p=>p.sample));
+  }
+
+  function renderAlerts(all){
+    const box = $("#alerts"), L = state.settings.limit, D = state.settings.dueDays;
+    if(!allLoaded()){ box.innerHTML=""; return; }
+    const over = all.filter(a=>a.overLimit).sort((a,b)=>b.owing-a.owing);
+    const late = all.flatMap(a=>a.overdue.map(o=>({a,o}))).sort((x,y)=>y.o.late-x.o.late);
+    let h="";
+    if(over.length){
+      h += `<div class="alert"><div class="stripe"></div><div class="body">
+        <div class="head"><h3>ยอดค้างชำระถึง ${fmtShort(L)} แล้ว · ${over.length} ราย</h3><span class="small muted">ยอดสั่งสะสม หักยอดโอนแล้ว</span></div>
+        <ul>${over.map(a=>`<li><button data-open="${a.cust.id}">${esc(a.cust.name)}</button>
+          <span>ค้าง <b class="num">${fmt(a.owing)}</b></span>
+          <span class="small muted">เกินวงเงิน <span class="num">${fmt(a.owing-L)}</span></span></li>`).join("")}</ul></div></div>`;
+    }
+    if(late.length){
+      h += `<div class="alert"><div class="stripe"></div><div class="body">
+        <div class="head"><h3>บิลสั่งของเกิน ${D} วันแล้วยังไม่โอน · ${late.length} บิล</h3><span class="small muted">นับจากวันสั่ง ${D} วัน = วันครบกำหนด</span></div>
+        <ul>${late.slice(0,12).map(({a,o})=>`<li><button data-open="${a.cust.id}">${esc(a.cust.name)}</button>
+          <span class="small">สั่ง ${thDate(o.date)} · ครบกำหนด ${thDate(o.due)}</span>
+          <span class="pill bad">เลยมา ${o.late} วัน</span>
+          <span>ค้าง <b class="num">${fmt(o.rem)}</b></span></li>`).join("")}
+          ${late.length>12?`<li class="small muted">และอีก ${late.length-12} บิล ดูได้ในรายละเอียดลูกค้า</li>`:""}</ul></div></div>`;
+    }
+    const near = all.filter(a=>a.nearLimit);
+    if(near.length){
+      h += `<div class="alert warn"><div class="stripe"></div><div class="body">
+        <div class="head"><h3>ใกล้ถึงวงเงิน (80% ขึ้นไป) · ${near.length} ราย</h3></div>
+        <ul>${near.map(a=>`<li><button data-open="${a.cust.id}">${esc(a.cust.name)}</button>
+          <span>ค้าง <b class="num">${fmt(a.owing)}</b></span><span class="small muted">อีก <span class="num">${fmt(L-a.owing)}</span> ถึงวงเงิน</span></li>`).join("")}</ul></div></div>`;
+    }
+    if(!h && state.customers.length) h = `<div class="alert-ok">ไม่มีลูกค้าค้างเกินวงเงิน และไม่มีบิลค้างเกิน ${D} วัน</div>`;
+    box.innerHTML = h;
+  }
+
+  function renderSummary(all){
+    const owing = all.reduce((s,a)=>s+Math.max(0,a.owing),0);
+    const od = all.reduce((s,a)=>s+a.overdueAmt,0);
+    const nOver = all.filter(a=>a.overLimit).length;
+    const nLate = all.reduce((s,a)=>s+a.overdue.length,0);
+    $("#summary").innerHTML = `
+      <div class="panel stat"><span class="eyebrow">ยอดค้างรวมทุกลูกค้า</span><span class="v">${fmt(owing)}</span><span class="small muted">${all.length} ลูกค้า</span></div>
+      <div class="panel stat ${od?"bad":""}"><span class="eyebrow">ค้างเกินกำหนด</span><span class="v">${fmt(od)}</span><span class="small muted">${nLate} บิล</span></div>
+      <div class="panel stat ${nOver?"bad":""}"><span class="eyebrow">ลูกค้าเกินวงเงิน</span><span class="v">${nOver} ราย</span><span class="small muted">วงเงิน ${fmtShort(state.settings.limit)}</span></div>
+      <div class="panel stat"><span class="eyebrow">โอนเข้า 30 วันล่าสุด</span><span class="v">${fmt(state.payments.filter(p=>daysBetween(p.date,today())<=30&&daysBetween(p.date,today())>=0).reduce((s,p)=>s+(+p.amount||0),0))}</span><span class="small muted">ทุกลูกค้า</span></div>`;
+  }
+
+  function renderSelects(){
+    const opts = state.customers.slice().sort((a,b)=>a.name.localeCompare(b.name,"th"));
+    ["#o-cust","#p-cust"].forEach(sel=>{
+      const el=$(sel), cur=el.value || state.selected || "";
+      el.innerHTML = opts.length ? opts.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")
+        : `<option value="">เพิ่มลูกค้าก่อน</option>`;
+      if(opts.some(c=>c.id===cur)) el.value=cur;
+    });
+  }
+
+  function renderList(all){
+    const ul=$("#custlist"), L=state.settings.limit;
+    if(!allLoaded()){ ul.innerHTML=`<li class="empty">กำลังโหลดข้อมูล…</li>`; return; }
+    if(!all.length){ ul.innerHTML=`<li class="empty"><strong>ยังไม่มีลูกค้า</strong><span>ใช้แท็บ “เพิ่มลูกค้า” ด้านบน แล้วบันทึกการสั่งและการโอนเงินได้เลย</span></li>`; return; }
+    let rows = all.filter(a=>a.cust.name.toLowerCase().includes(state.q.toLowerCase()));
+    if(state.filter==="limit") rows=rows.filter(a=>a.overLimit);
+    if(state.filter==="overdue") rows=rows.filter(a=>a.overdue.length);
+    if(state.filter==="owing") rows=rows.filter(a=>a.owing>0.004);
+    rows.sort((a,b)=>(b.overLimit-a.overLimit)||(b.overdue.length-a.overdue.length)||(b.owing-a.owing));
+    if(!rows.length){ ul.innerHTML=`<li class="empty">ไม่มีลูกค้าตรงกับตัวกรองนี้</li>`; return; }
+    ul.innerHTML = rows.map(a=>{
+      const pct = Math.max(0,Math.min(100,a.owing/L*100));
+      const cls = a.overLimit?"bad":a.nearLimit?"warn":"";
+      return `<li class="cust" aria-current="${a.cust.id===state.selected}"><button data-open="${a.cust.id}">
+        <div class="row1"><span class="name">${esc(a.cust.name)}</span><span class="num">${fmt(a.owing)}</span></div>
+        <div class="meter ${cls}" title="${pct.toFixed(0)}% ของวงเงิน"><i style="width:${pct}%"></i></div>
+        <div class="row2"><span>สั่งล่าสุด ${thDate(a.lastOrder)} · โอนล่าสุด ${thDate(a.lastPay)}</span>
+          <span class="pills">${a.cust.sample?`<span class="pill sample">ตัวอย่าง</span>`:""}
+          ${a.overLimit?`<span class="pill bad">เกินวงเงิน</span>`:a.nearLimit?`<span class="pill warn">ใกล้วงเงิน</span>`:""}
+          ${a.overdue.length?`<span class="pill bad">ค้างเกินกำหนด ${a.overdue.length} บิล</span>`:""}
+          ${a.owing<=0.004 && a.os.length?`<span class="pill ok">ชำระครบ</span>`:""}</span></div>
+      </button></li>`;}).join("");
+  }
+
+  function renderDetail(all){
+    const el=$("#detail"), L=state.settings.limit;
+    const a = all.find(x=>x.cust.id===state.selected) || null;
+    if(!a){
+      el.innerHTML = `<div class="empty"><strong>เลือกลูกค้าเพื่อดูรายละเอียด</strong><span>จะแสดงวันที่สั่ง ยอดแต่ละบิล วันที่โอน และยอดคงค้างสะสม</span></div>`;
+      return;
+    }
+    const c=a.cust;
+    const statusPill = o => o.status==="paid" ? `<span class="pill ok">ชำระครบ ${thDate(o.clearedOn)}</span>`
+      : o.overdue ? `<span class="pill bad">เกินกำหนด ${o.late} วัน</span>`
+      : o.status==="partial" ? `<span class="pill warn">ชำระบางส่วน</span>` : `<span class="pill info">รอชำระ · อีก ${-o.late} วัน</span>`;
+    // running statement: orders before payments on the same day
+    const lines = [...a.os.map(o=>({k:"o",d:o.date,t:o.createdAt,x:o})), ...a.ps.map(p=>({k:"p",d:p.date,t:p.createdAt,x:p}))]
+      .sort((x,y)=>x.d.localeCompare(y.d)||(x.k===y.k?String(x.t).localeCompare(String(y.t)):(x.k==="o"?-1:1)));
+    let bal=0;
+    const st = lines.map(l=>{ bal += l.k==="o" ? +l.x.amount : -l.x.amount;
+      return `<tr><td>${thDate(l.d)}</td><td>${l.k==="o"?"สั่งของ":"<b>โอนเงิน</b>"}</td><td>${esc(l.x.note||"")}</td>
+        <td class="r num">${l.k==="o"?fmt(l.x.amount):""}</td><td class="r num">${l.k==="p"?fmt(l.x.amount):""}</td>
+        <td class="r num" style="${bal>=L?"color:var(--bad);font-weight:600":""}">${fmt(bal)}</td>
+        <td class="r"><button class="linkbtn" data-del="${l.k==="o"?"orders":"payments"}/${l.x.id}">ลบ</button></td></tr>`;}).reverse().join("");
+    const pctLimit = Math.max(0,a.owing/L*100);
+    el.innerHTML = `
+      <div class="detail-head">
+        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start">
+          <div style="min-width:0"><h2 style="overflow-wrap:anywhere">${esc(c.name)}</h2>
+            <div class="small muted">${[c.phone,c.note].filter(Boolean).map(esc).join(" · ")||"&nbsp;"}</div></div>
+          <div class="pills">${c.sample?`<span class="pill sample">ข้อมูลตัวอย่าง</span>`:""}
+            ${a.overLimit?`<span class="pill bad">ค้างเกินวงเงิน</span>`:""}${a.overdue.length?`<span class="pill bad">ค้างเกินกำหนด ${a.overdue.length} บิล</span>`:""}</div>
+        </div>
+        <div class="kv">
+          <div><span class="eyebrow">ยอดสั่งสะสม</span><span class="num">${fmt(a.totalOrder)}</span><span class="small muted">${a.os.length} ครั้ง</span></div>
+          <div><span class="eyebrow">โอนแล้ว</span><span class="num">${fmt(a.totalPaid)}</span><span class="small muted">${a.ps.length} ครั้ง</span></div>
+          <div><span class="eyebrow">ยอดค้าง</span><span class="num" style="color:${a.overLimit?"var(--bad)":"inherit"}">${fmt(a.owing)}</span><span class="small muted">${pctLimit.toFixed(0)}% ของวงเงิน ${fmtShort(L)}</span></div>
+        </div>
+        <div class="meter ${a.overLimit?"bad":a.nearLimit?"warn":""}"><i style="width:${Math.min(100,pctLimit)}%"></i></div>
+        ${a.credit>0.004?`<div class="small" style="color:var(--ok)">มียอดโอนเกินบิล ${fmt(a.credit)} (เครดิตคงเหลือ)</div>`:""}
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn ghost" data-quick="order">+ บันทึกการสั่งของ</button>
+          <button class="btn ghost" data-quick="pay">+ บันทึกการโอนเงิน</button>
+          ${a.os.length||a.ps.length?"":`<button class="linkbtn" data-del="customers/${c.id}">ลบลูกค้านี้</button>`}
+        </div>
+      </div>
+      <div class="section">
+        <h3>บิลสั่งของและสถานะการชำระ</h3>
+        ${a.os.length?`<div class="tablewrap"><table><thead><tr><th>วันที่สั่ง</th><th>เลขบิล</th><th class="r">ยอดสั่ง</th><th>ครบกำหนด</th><th>วันที่โอนชำระ</th><th class="r">คงค้าง</th><th>สถานะ</th></tr></thead><tbody>
+          ${a.os.slice().reverse().map(o=>`<tr class="${o.overdue?"overdue":""}"><td>${thDate(o.date)}</td><td>${esc(o.note||"—")}</td>
+            <td class="r num">${fmt(o.amount)}</td><td>${thDate(o.due)}</td>
+            <td class="small">${o.pays.length?o.pays.map(p=>`${thDate(p.date)} <span class="num">${fmt(p.amount)}</span>`).join("<br>"):`<span class="muted">ยังไม่โอน</span>`}</td>
+            <td class="r num">${o.rem?fmt(o.rem):"—"}</td><td>${statusPill(o)}</td></tr>`).join("")}
+        </tbody></table></div>`:`<div class="empty">ยังไม่มีการสั่งของ</div>`}
+      </div>
+      <div class="section">
+        <h3>รายการเดินบัญชี (ล่าสุดอยู่บน)</h3>
+        ${lines.length?`<div class="tablewrap"><table><thead><tr><th>วันที่</th><th>รายการ</th><th>หมายเหตุ</th><th class="r">สั่งของ</th><th class="r">โอนเงิน</th><th class="r">ยอดค้างสะสม</th><th></th></tr></thead><tbody>${st}</tbody></table></div>`
+          :`<div class="empty">ยังไม่มีรายการ</div>`}
+      </div>`;
+  }
+
+  /* ---------- interactions ---------- */
+  function select(id){ state.selected=id; ["#o-cust","#p-cust"].forEach(s=>{ if($(s).querySelector(`option[value="${id}"]`)) $(s).value=id; }); render(); }
+  document.addEventListener("click", e=>{
+    const open=e.target.closest("[data-open]");
+    if(open){ select(open.dataset.open); if(innerWidth<900) $("#detail").scrollIntoView({behavior:"smooth",block:"start"}); return; }
+    const tab=e.target.closest("[data-tab]"); if(tab){ showTab(tab.dataset.tab); return; }
+    const q=e.target.closest("[data-quick]");
+    if(q){ showTab(q.dataset.quick); $(".tabs").scrollIntoView({behavior:"smooth",block:"center"}); $(q.dataset.quick==="order"?"#o-amt":"#p-amt").focus({preventScroll:true}); return; }
+    const chip=e.target.closest("[data-filter]");
+    if(chip){ state.filter=chip.dataset.filter; document.querySelectorAll("[data-filter]").forEach(b=>b.setAttribute("aria-pressed",b===chip)); render(); return; }
+    const del=e.target.closest("[data-del]");
+    if(del){
+      if(!del.classList.contains("confirm")){ del.classList.add("confirm"); del.textContent="ยืนยันลบ?"; setTimeout(()=>{ if(del.isConnected){del.classList.remove("confirm");del.textContent=del.dataset.del.startsWith("customers")?"ลบลูกค้านี้":"ลบ";} },3500); return; }
+      const path=del.dataset.del; if(path.startsWith("customers/")) state.selected=null;
+      write(()=>state.db.doc(path).delete(), null); return;
+    }
+  });
+  function showTab(name){
+    document.querySelectorAll("[data-tab]").forEach(t=>t.setAttribute("aria-selected",t.dataset.tab===name));
+    document.querySelectorAll("form.entry").forEach(f=>f.hidden=f.dataset.form!==name);
+  }
+  $("#search").addEventListener("input",e=>{ state.q=e.target.value; render(); });
+
+  async function write(fn, note, okMsg){
+    if(!state.db){ if(note){note.className="formnote err"; note.textContent="บันทึกไม่ได้: ต้องเปิดหน้านี้บน claude.ai และลงชื่อเข้าใช้";} return false; }
+    try{ await fn(); if(note){ note.className="formnote ok"; note.textContent=okMsg||"บันทึกแล้ว"; } return true; }
+    catch(err){
+      const m = err&&err.code==="storage" ? "บันทึกไม่สำเร็จ เบราว์เซอร์นี้ไม่อนุญาตให้เก็บข้อมูล (เช่น โหมดไม่ระบุตัวตน) หรือพื้นที่เต็ม"
+        : "บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง";
+      if(note){ note.className="formnote err"; note.textContent=m; } else showStatus(m);
+      return false;
+    }
+  }
+  const stamp = () => new Date().toISOString();
+  const amt = v => Math.round(parseFloat(v)*100)/100;
+
+  $("#f-order").addEventListener("submit", async e=>{
+    e.preventDefault(); const n=$("#n-order"), cid=$("#o-cust").value, a=amt($("#o-amt").value);
+    if(!cid){ n.className="formnote err"; n.textContent="เพิ่มลูกค้าก่อนบันทึกการสั่ง"; return; }
+    if(!(a>0)){ n.className="formnote err"; n.textContent="ใส่ยอดสั่งมากกว่า 0"; return; }
+    const ok = await write(()=>state.db.collection("orders").add({customerId:cid,date:$("#o-date").value,amount:a,note:$("#o-note").value.trim(),createdAt:stamp()}), n,
+      `บันทึกการสั่ง ${fmt(a)} แล้ว`);
+    if(ok){ $("#o-amt").value=""; $("#o-note").value=""; state.selected=cid; render(); }
+  });
+  $("#f-pay").addEventListener("submit", async e=>{
+    e.preventDefault(); const n=$("#n-pay"), cid=$("#p-cust").value, a=amt($("#p-amt").value);
+    if(!cid){ n.className="formnote err"; n.textContent="เพิ่มลูกค้าก่อนบันทึกการโอน"; return; }
+    if(!(a>0)){ n.className="formnote err"; n.textContent="ใส่ยอดโอนมากกว่า 0"; return; }
+    const ok = await write(()=>state.db.collection("payments").add({customerId:cid,date:$("#p-date").value,amount:a,note:$("#p-note").value.trim(),createdAt:stamp()}), n,
+      `บันทึกการโอน ${fmt(a)} แล้ว`);
+    if(ok){ $("#p-amt").value=""; $("#p-note").value=""; state.selected=cid; render(); }
+  });
+  $("#f-cust").addEventListener("submit", async e=>{
+    e.preventDefault(); const n=$("#n-cust"), name=$("#c-name").value.trim();
+    if(!name){ n.className="formnote err"; n.textContent="ใส่ชื่อลูกค้า"; return; }
+    if(state.customers.some(c=>c.name.trim()===name)){ n.className="formnote err"; n.textContent="มีลูกค้าชื่อนี้อยู่แล้ว"; return; }
+    let ref=null;
+    const ok = await write(async()=>{ ref = await state.db.collection("customers").add({name,phone:$("#c-phone").value.trim(),note:$("#c-note").value.trim(),createdAt:stamp()}); }, n, `เพิ่ม “${name}” แล้ว`);
+    if(ok){ ["#c-name","#c-phone","#c-note"].forEach(s=>$(s).value=""); if(ref) { state.selected=ref.id; } showTab("order"); render(); if(ref) $("#o-cust").value=ref.id; }
+  });
+  $("#f-settings").addEventListener("submit", async e=>{
+    e.preventDefault(); const n=$("#n-settings"), limit=+$("#s-limit").value, dueDays=Math.round(+$("#s-days").value);
+    if(!(limit>0)||!(dueDays>0)){ n.className="formnote err"; n.textContent="ใส่ตัวเลขมากกว่า 0"; return; }
+    await write(()=>state.db.doc("settings/main").set({limit,dueDays}), n, "บันทึกการตั้งค่าแล้ว");
+  });
+  $("#clear-sample").addEventListener("click", async e=>{
+    const b=e.currentTarget;
+    if(!b.dataset.armed){ b.dataset.armed="1"; b.textContent="กดอีกครั้งเพื่อยืนยันการลบตัวอย่าง"; b.classList.add("danger"); return; }
+    b.disabled=true;
+    const targets=[...state.customers.filter(x=>x.sample).map(x=>"customers/"+x.id),...state.orders.filter(x=>x.sample).map(x=>"orders/"+x.id),...state.payments.filter(x=>x.sample).map(x=>"payments/"+x.id)];
+    for(const p of targets){ try{ await state.db.doc(p).delete(); }catch(_){} }
+    state.selected=null; b.disabled=false; delete b.dataset.armed; b.textContent="ลบข้อมูลตัวอย่างทั้งหมด"; b.classList.remove("danger");
+    $("#n-settings").className="formnote ok"; $("#n-settings").textContent="ลบข้อมูลตัวอย่างแล้ว";
+  });
+
+  function showStatus(msg){ const s=$("#status"); s.textContent=msg; s.hidden=!msg; }
+  const allLoaded = () => state.loaded.c && state.loaded.o && state.loaded.p;
+  function fillSettings(){ $("#s-limit").value=state.settings.limit; $("#s-days").value=state.settings.dueDays; }
+  fillSettings(); render();
+
+  /* ---------- data: saved in this browser (localStorage) ---------- */
+  const KEY = "wholesale-ledger-v1";
+  const newId = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  function readStore(){ try{ const raw=localStorage.getItem(KEY); return raw ? JSON.parse(raw) : null; }catch(_){ return undefined; } }
+  function persist(){
+    try{ localStorage.setItem(KEY, JSON.stringify({version:1, customers:state.customers, orders:state.orders, payments:state.payments, settings:state.settings})); }
+    catch(_){ const e=new Error("storage"); e.code="storage"; throw e; }
+  }
+  function applyData(d){
+    state.customers = Array.isArray(d.customers)?d.customers:[];
+    state.orders = Array.isArray(d.orders)?d.orders:[];
+    state.payments = Array.isArray(d.payments)?d.payments:[];
+    const s=d.settings||{}; state.settings={limit:+s.limit||5000000, dueDays:+s.dueDays||7};
+    fillSettings();
+  }
+  // small store with the same calls the forms use
+  state.db = {
+    collection(name){ return { add: async data => { const id=newId(name[0]); state[name].push({id,...data}); persist(); render(); return {id}; } }; },
+    doc(path){ const [name,id]=path.split("/"); return {
+      delete: async () => { state[name]=state[name].filter(x=>x.id!==id); persist(); render(); },
+      set: async data => { if(name==="settings"){ state.settings={limit:+data.limit,dueDays:+data.dueDays}; } persist(); render(); }
+    }; }
+  };
+  function sampleData(){
+    const d = n => addDays(today(), -n), at = n => d(n)+"T01:00:00Z";
+    const C=(id,name,phone,note)=>({id,name,phone,note,createdAt:at(60),sample:true});
+    const O=(id,c,n,amount,note)=>({id,customerId:c,date:d(n),amount,note,createdAt:at(n),sample:true});
+    return { customers:[C("ex-a","ร้านเจริญพาณิชย์ (ตัวอย่าง)","081-234-5678","ตลาดไท แผง B12"),C("ex-b","หจก. สมบูรณ์ค้าส่ง (ตัวอย่าง)","089-555-0101","ติดต่อคุณสมศรี"),C("ex-c","ร้านมั่งมีการค้า (ตัวอย่าง)","","สาขานครปฐม"),C("ex-d","บริษัท ทองดีเทรดดิ้ง (ตัวอย่าง)","02-111-2222","")],
+      orders:[O("ex-a1","ex-a",42,1800000,"INV-0901"),O("ex-a2","ex-a",27,2200000,"INV-0934"),O("ex-a3","ex-a",14,1500000,"INV-0962"),O("ex-a4","ex-a",4,1200000,"INV-0988"),O("ex-a5","ex-a",2,900000,"INV-0995"),
+        O("ex-b1","ex-b",31,800000,"INV-0921"),O("ex-b2","ex-b",12,650000,"INV-0967"),O("ex-b3","ex-b",3,420000,"INV-0990"),
+        O("ex-c1","ex-c",22,2000000,"INV-0945"),O("ex-c2","ex-c",6,2300000,"INV-0981"),O("ex-d1","ex-d",17,500000,"INV-0955"),O("ex-d2","ex-d",3,350000,"INV-0991")],
+      payments:[O("ex-ap1","ex-a",34,1500000,"โอน SCB"),O("ex-ap2","ex-a",17,500000,"โอน SCB"),O("ex-bp1","ex-b",26,800000,"KBank"),O("ex-bp2","ex-b",5,300000,"KBank"),O("ex-dp1","ex-d",12,500000,"BBL")],
+      settings:{limit:5000000,dueDays:7} };
+  }
+  const saved = readStore();
+  if(saved===undefined){ showStatus("เบราว์เซอร์นี้ไม่อนุญาตให้เก็บข้อมูล (เช่น โหมดไม่ระบุตัวตน) ข้อมูลจะหายเมื่อปิดหน้า"); applyData(sampleData()); }
+  else if(saved===null){ applyData(sampleData()); try{ persist(); }catch(_){} }
+  else applyData(saved);
+  state.loaded={c:true,o:true,p:true};
+  render();
+  // keep other open tabs in sync
+  window.addEventListener("storage", e=>{ if(e.key===KEY){ const s=readStore(); if(s) { applyData(s); render(); } } });
+
+  /* ---------- backup ---------- */
+  $("#export").addEventListener("click", ()=>{
+    const blob = new Blob([JSON.stringify({version:1, exportedAt:new Date().toISOString(), customers:state.customers, orders:state.orders, payments:state.payments, settings:state.settings}, null, 2)], {type:"application/json"});
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "ledger-backup-" + today() + ".json";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+    $("#n-backup").className="formnote ok"; $("#n-backup").textContent="ดาวน์โหลดไฟล์สำรองแล้ว เก็บไว้ในที่ปลอดภัย";
+  });
+  let pending=null;
+  $("#import-file").addEventListener("change", e=>{
+    const f=e.target.files[0], n=$("#n-backup"); if(!f) return;
+    const r=new FileReader();
+    r.onload=()=>{ try{
+        const d=JSON.parse(r.result);
+        if(!Array.isArray(d.customers)||!Array.isArray(d.orders)||!Array.isArray(d.payments)) throw 0;
+        pending=d; $("#import-confirm").hidden=false;
+        n.className="formnote"; n.textContent=`ไฟล์นี้มีลูกค้า ${d.customers.length} ราย · บิล ${d.orders.length} รายการ · โอน ${d.payments.length} รายการ กดปุ่มสีแดงเพื่อแทนที่ข้อมูลปัจจุบัน`;
+      }catch(_){ pending=null; $("#import-confirm").hidden=true; n.className="formnote err"; n.textContent="ไฟล์นี้ไม่ใช่ไฟล์สำรองของสมุดลูกหนี้ เลือกไฟล์ .json ที่ดาวน์โหลดจากหน้านี้"; }
+      e.target.value=""; };
+    r.readAsText(f);
+  });
+  $("#import-confirm").addEventListener("click", ()=>{
+    if(!pending) return; const n=$("#n-backup");
+    applyData(pending); state.selected=null; pending=null; $("#import-confirm").hidden=true;
+    try{ persist(); n.className="formnote ok"; n.textContent="นำเข้าข้อมูลแล้ว"; }catch(_){ n.className="formnote err"; n.textContent="นำเข้าแล้ว แต่เบราว์เซอร์นี้บันทึกไม่ได้ ข้อมูลจะหายเมื่อปิดหน้า"; }
+    render();
+  });
+})();
+</script>
+</body>
+</html>
